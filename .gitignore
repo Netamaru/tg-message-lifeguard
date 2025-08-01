@@ -2,3 +2,5 @@
 __pycache__/
 backup/
 venv/
+users.json
+.DS_Store

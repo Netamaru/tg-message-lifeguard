@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Telegram Message Viewer</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: #0e1621;
+        color: #ffffff;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        background: #2b5278;
+        padding: 15px 20px;
+        border-bottom: 1px solid #1e3a52;
+        display: flex;
+        align-items: center;
+        gap: 15px;
+      }
+
+      .header h1 {
+        font-size: 18px;
+        font-weight: 500;
+      }
+
+      .controls {
+        background: #17212b;
+        padding: 15px 20px;
+        border-bottom: 1px solid #1e3a52;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .controls input,
+      .controls select,
+      .controls button {
+        padding: 8px 12px;
+        border: 1px solid #3e546a;
+        background: #242f3d;
+        color: #ffffff;
+        border-radius: 8px;
+        font-size: 14px;
+      }
+
+      .controls input:focus,
+      .controls select:focus {
+        outline: none;
+        border-color: #64a9dc;
+      }
+
+      .controls button {
+        background: #64a9dc;
+        border: none;
+        cursor: pointer;
+        transition: background 0.2s;
+      }
+
+      .controls button:hover {
+        background: #5a9bd4;
+      }
+
+      .chat-container {
+        flex: 1;
+        overflow-y: auto;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .message {
+        max-width: 80%;
+        margin-bottom: 10px;
+        animation: slideIn 0.3s ease-out;
+      }
+
+      @keyframes slideIn {
+        from {
+          opacity: 0;
+          transform: translateY(10px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
+      }
+
+      .message.outgoing {
+        align-self: flex-end;
+      }
+
+      .message.incoming {
+        align-self: flex-start;
+      }
+
+      .message-bubble {
+        background: #242f3d;
+        border-radius: 18px;
+        padding: 12px 16px;
+        position: relative;
+        word-wrap: break-word;
+      }
+
+      .message.outgoing .message-bubble {
+        background: #2b5278;
+        border-bottom-right-radius: 8px;
+      }
+
+      .message.incoming .message-bubble {
+        background: #242f3d;
+        border-bottom-left-radius: 8px;
+      }
+
+      .message-header {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+
+      .sender-name {
+        color: #64a9dc;
+        font-weight: 500;
+      }
+
+      .message-time {
+        color: #8e9ba8;
+        font-size: 12px;
+      }
+
+      .deleted-by {
+        color: #ff6b6b;
+        font-size: 11px;
+        font-style: italic;
+      }
+
+      .message-content {
+        line-height: 1.4;
+        white-space: pre-wrap;
+      }
+
+      .media-container {
+        margin: 8px 0;
+        border-radius: 12px;
+        overflow: hidden;
+        max-width: 400px;
+      }
+
+      .media-image {
+        width: 100%;
+        height: auto;
+        display: block;
+        cursor: pointer;
+        transition: transform 0.2s;
+      }
+
+      .media-image:hover {
+        transform: scale(1.02);
+      }
+
+      .media-video,
+      .media-audio {
+        border-radius: 8px;
+        background: #000;
+      }
+
+      .media-file {
+        transition: background 0.2s;
+      }
+
+      .media-file:hover {
+        background: rgba(255, 255, 255, 0.15) !important;
+      }
+
+      .media-info {
+        background: rgba(0, 0, 0, 0.3);
+        padding: 4px 8px;
+        font-size: 11px;
+        color: #ffffff;
+        text-align: center;
+      }
+
+      .forward-info {
+        color: #64a9dc;
+        font-size: 12px;
+        margin-bottom: 6px;
+        font-style: italic;
+      }
+
+      .reply-info {
+        background: rgba(100, 169, 220, 0.1);
+        border-left: 3px solid #64a9dc;
+        padding: 6px 10px;
+        margin-bottom: 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        color: #8e9ba8;
+      }
+
+      .stats {
+        background: #17212b;
+        padding: 15px 20px;
+        border-top: 1px solid #1e3a52;
+        display: flex;
+        justify-content: space-between;
+        font-size: 14px;
+        color: #8e9ba8;
+      }
+
+      .loading {
+        text-align: center;
+        padding: 40px;
+        color: #8e9ba8;
+      }
+
+      .load-more-indicator {
+        text-align: center;
+        padding: 20px;
+        color: #8e9ba8;
+        font-size: 14px;
+      }
+
+      .error {
+        background: #ff6b6b;
+        color: white;
+        padding: 10px 15px;
+        border-radius: 8px;
+        margin: 10px 20px;
+      }
+
+      .thread-selector {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .modal {
+        display: none;
+        position: fixed;
+        z-index: 1000;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(0, 0, 0, 0.9);
+        justify-content: center;
+        align-items: center;
+      }
+
+      .modal img {
+        max-width: 90%;
+        max-height: 90%;
+        border-radius: 8px;
+      }
+
+      .modal:target {
+        display: flex;
+      }
+
+      .close-modal {
+        position: absolute;
+        top: 20px;
+        right: 30px;
+        color: #ffffff;
+        font-size: 40px;
+        cursor: pointer;
+      }
+
+      @media (max-width: 768px) {
+        .message {
+          max-width: 95%;
+        }
+
+        .controls {
+          flex-direction: column;
+          align-items: stretch;
+        }
+
+        .controls > div {
+          display: flex;
+          gap: 10px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>📱 Telegram Message Viewer</h1>
+    </div>
+
+    <div class="controls">
+      <div class="thread-selector">
+        <label>Group ID:</label>
+        <input
+          type="text"
+          id="groupId"
+          placeholder="e.g., 1002074491972"
+          value="1002074491972"
+        />
+
+        <label>Thread ID:</label>
+        <select id="threadId">
+          <option value="">Select thread...</option>
+          <option value="no-thread">No Thread (All Messages)</option>
+        </select>
+
+        <button onclick="loadMessages()">Load Messages</button>
+      </div>
+
+      <div>
+        <label>Search:</label>
+        <input
+          type="text"
+          id="searchInput"
+          placeholder="Search messages..."
+          oninput="filterMessages()"
+        />
+
+        <label>Show:</label>
+        <select id="filterType" onchange="filterMessages()">
+          <option value="all">All Messages</option>
+          <option value="media">All Media</option>
+          <option value="images">Images Only</option>
+          <option value="videos">Videos Only</option>
+          <option value="audio">Audio Only</option>
+          <option value="documents">Documents Only</option>
+          <option value="text">Text Only</option>
+        </select>
+
+        <label>Date Format:</label>
+        <select id="dateFormat" onchange="refreshDisplay()">
+          <option value="absolute">Absolute (May 20, 2024, 10:30 AM)</option>
+          <option value="relative">Relative (Yesterday, Today, etc.)</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="chat-container" id="chatContainer">
+      <div class="loading">
+        Select a group and thread, then click "Load Messages" to view the
+        backup.
+      </div>
+    </div>
+
+    <div class="stats" id="stats">
+      <span>Ready to load messages</span>
+      <span id="messageCount"></span>
+    </div>
+
+    <!-- Modal for image preview -->
+    <div id="imageModal" class="modal">
+      <span class="close-modal" onclick="closeModal()">&times;</span>
+      <img id="modalImage" src="" alt="Preview" />
+    </div>
+
+    <script>
+      let allMessages = [];
+      let currentMessages = [];
+      let visibleMessages = [];
+      let messagesPerBatch = 50; // Number of messages to render at once
+      let currentVisibleIndex = 0;
+      let isLoading = false;
+      let userMappings = {}; // Store user ID to username mappings
+
+      async function loadUserMappings() {
+        try {
+          const response = await fetch("users.json");
+          if (response.ok) {
+            userMappings = await response.json();
+            console.log("User mappings loaded successfully");
+          } else {
+            console.log("users.json not found, using user IDs instead");
+          }
+        } catch (error) {
+          console.log(
+            "Could not load users.json, using user IDs instead:",
+            error.message,
+          );
+        }
+      }
+
+      function getUserDisplayName(userId) {
+        const userIdStr = userId.toString();
+        return userMappings[userIdStr] || `User ${userId}`;
+      }
+
+      async function loadMessages() {
+        const groupId = document.getElementById("groupId").value.trim();
+        const threadId = document.getElementById("threadId").value.trim();
+        const chatContainer = document.getElementById("chatContainer");
+
+        if (!groupId) {
+          showError("Please enter a Group ID");
+          return;
+        }
+
+        if (!threadId) {
+          showError("Please select a Thread ID");
+          return;
+        }
+
+        // Show loading
+        chatContainer.innerHTML =
+          '<div class="loading">Loading messages and user mappings...</div>';
+
+        try {
+          // Load user mappings first
+          await loadUserMappings();
+          // Construct the path to the JSON file
+          let jsonPath;
+          if (threadId === "no-thread") {
+            jsonPath = `backup/${groupId}/dump.json`;
+          } else {
+            jsonPath = `backup/${groupId}/thread_${threadId}/dump.json`;
+          }
+
+          // Fetch the JSON file
+          const response = await fetch(jsonPath);
+          if (!response.ok) {
+            throw new Error(
+              `Could not load ${jsonPath}. Make sure the backup files are in the correct location.`,
+            );
+          }
+
+          const messages = await response.json();
+          allMessages = messages;
+          currentMessages = messages;
+
+          // Sort messages by date (oldest first)
+          currentMessages = currentMessages.sort(
+            (a, b) => new Date(a.date) - new Date(b.date),
+          );
+
+          // Reset lazy loading state
+          currentVisibleIndex = 0;
+          visibleMessages = [];
+
+          displayMessages(currentMessages);
+          updateStats(currentMessages.length, allMessages.length);
+        } catch (error) {
+          showError(`Error loading messages: ${error.message}`);
+        }
+      }
+
+      function displayMessages(messages, scrollToBottom = true) {
+        const chatContainer = document.getElementById("chatContainer");
+
+        if (messages.length === 0) {
+          chatContainer.innerHTML =
+            '<div class="loading">No messages found.</div>';
+          return;
+        }
+
+        // Clear container and reset visible messages
+        chatContainer.innerHTML = "";
+        visibleMessages = [];
+
+        if (scrollToBottom && messages.length > messagesPerBatch) {
+          // Start from the end to show newest messages first
+          currentVisibleIndex = Math.max(0, messages.length - messagesPerBatch);
+        } else {
+          // Start from the beginning
+          currentVisibleIndex = 0;
+        }
+
+        // Load initial batch
+        loadMoreMessages(messages);
+
+        // Set up scroll listener for lazy loading (works in both directions)
+        setupScrollListener(chatContainer, messages);
+
+        // Scroll to bottom if requested
+        if (scrollToBottom) {
+          scrollToNewest();
+        }
+      }
+
+      function loadMoreMessages(messages) {
+        if (isLoading) {
+          return;
+        }
+
+        isLoading = true;
+        const chatContainer = document.getElementById("chatContainer");
+
+        // Remove load more indicator if it exists
+        const existingIndicator = chatContainer.querySelector(
+          ".load-more-indicator",
+        );
+        if (existingIndicator) {
+          existingIndicator.remove();
+        }
+
+        // Calculate batch end
+        const batchEnd = Math.min(
+          currentVisibleIndex + messagesPerBatch,
+          messages.length,
+        );
+
+        // Add messages to visible array and render them
+        for (let i = currentVisibleIndex; i < batchEnd; i++) {
+          const message = messages[i];
+          visibleMessages.push(message);
+          const messageElement = createMessageElement(message);
+          chatContainer.appendChild(messageElement);
+        }
+
+        currentVisibleIndex = batchEnd;
+
+        // Add load more indicator if there are more messages
+        if (currentVisibleIndex < messages.length) {
+          const loadMoreIndicator = document.createElement("div");
+          loadMoreIndicator.className = "load-more-indicator";
+          loadMoreIndicator.textContent = `Loading more messages... (${currentVisibleIndex}/${messages.length})`;
+          chatContainer.appendChild(loadMoreIndicator);
+        }
+
+        isLoading = false;
+      }
+
+      function setupScrollListener(container, messages) {
+        // Remove existing listener
+        container.removeEventListener("scroll", container._scrollHandler);
+
+        // Create new scroll handler
+        container._scrollHandler = function () {
+          const threshold = 1000; // pixels from edge
+
+          // Check if user scrolled near the bottom - load newer messages
+          if (
+            container.scrollTop + container.clientHeight >=
+            container.scrollHeight - threshold
+          ) {
+            loadMoreMessages(messages);
+          }
+
+          // Check if user scrolled near the top - load older messages
+          if (container.scrollTop <= threshold && currentVisibleIndex > 0) {
+            loadPreviousMessages(messages);
+          }
+        };
+
+        container.addEventListener("scroll", container._scrollHandler);
+      }
+
+      function loadPreviousMessages(messages) {
+        if (isLoading || currentVisibleIndex <= 0) {
+          return;
+        }
+
+        isLoading = true;
+        const chatContainer = document.getElementById("chatContainer");
+
+        // Add loading indicator at top
+        const loadingIndicator = document.createElement("div");
+        loadingIndicator.className = "load-more-indicator";
+        loadingIndicator.textContent = "Loading older messages...";
+        chatContainer.insertBefore(loadingIndicator, chatContainer.firstChild);
+
+        // Calculate how many messages to load (going backwards)
+        const batchStart = Math.max(0, currentVisibleIndex - messagesPerBatch);
+        const currentScrollHeight = chatContainer.scrollHeight;
+
+        // Remove the loading indicator
+        loadingIndicator.remove();
+
+        // Add messages to the beginning of visible array and render them at the top
+        for (let i = batchStart; i < currentVisibleIndex; i++) {
+          const message = messages[i];
+          visibleMessages.unshift(message);
+          const messageElement = createMessageElement(message);
+          chatContainer.insertBefore(messageElement, chatContainer.firstChild);
+        }
+
+        currentVisibleIndex = batchStart;
+
+        // Maintain scroll position by adjusting for new content height
+        const newScrollHeight = chatContainer.scrollHeight;
+        chatContainer.scrollTop += newScrollHeight - currentScrollHeight;
+
+        isLoading = false;
+      }
+
+      function scrollToNewest() {
+        const chatContainer = document.getElementById("chatContainer");
+        // Use multiple attempts to ensure proper scrolling with lazy loading
+        setTimeout(() => {
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }, 50);
+        setTimeout(() => {
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        }, 200);
+      }
+
+      function createMessageElement(message) {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${
+          message.out ? "outgoing" : "incoming"
+        }`;
+
+        const bubble = document.createElement("div");
+        bubble.className = "message-bubble";
+
+        // Message header with sender and time
+        const header = document.createElement("div");
+        header.className = "message-header";
+
+        if (!message.out && message.from_id) {
+          const senderName = document.createElement("span");
+          senderName.className = "sender-name";
+          senderName.textContent = getUserDisplayName(message.from_id.user_id);
+          header.appendChild(senderName);
+        }
+
+        const time = document.createElement("span");
+        time.className = "message-time";
+        time.textContent = formatDate(message.date);
+        header.appendChild(time);
+
+        // Add deleted by info (this comes from the backup context)
+        const deletedBy = document.createElement("div");
+        deletedBy.className = "deleted-by";
+        deletedBy.textContent = "🗑️ Deleted message";
+        header.appendChild(deletedBy);
+
+        bubble.appendChild(header);
+
+        // Forward info
+        if (message.fwd_from) {
+          const forwardInfo = document.createElement("div");
+          forwardInfo.className = "forward-info";
+          const forwardUserId = message.fwd_from.from_id?.user_id;
+          forwardInfo.textContent = `📤 Forwarded from ${
+            forwardUserId ? getUserDisplayName(forwardUserId) : "Unknown"
+          }`;
+          bubble.appendChild(forwardInfo);
+        }
+
+        // Reply info
+        if (message.reply_to) {
+          const replyInfo = document.createElement("div");
+          replyInfo.className = "reply-info";
+          replyInfo.textContent = `↩️ Reply to message ${message.reply_to.reply_to_msg_id}`;
+          bubble.appendChild(replyInfo);
+        }
+
+        // Media content
+        if (message.local_media_file) {
+          const mediaContainer = document.createElement("div");
+          mediaContainer.className = "media-container";
+
+          const threadId = document.getElementById("threadId").value;
+          let filePath;
+          if (threadId === "no-thread") {
+            filePath = `backup/${document.getElementById("groupId").value}/${
+              message.local_media_file.local_path
+            }`;
+          } else {
+            filePath = `backup/${
+              document.getElementById("groupId").value
+            }/thread_${threadId}/${message.local_media_file.local_path}`;
+          }
+
+          const fileType = getFileType(message.local_media_file.filename);
+
+          if (fileType === "image" || fileType === "gif") {
+            // Images and animated GIFs
+            const img = document.createElement("img");
+            img.className = "media-image";
+            img.src = filePath;
+            img.alt = message.local_media_file.filename;
+            img.onclick = () => openImageModal(img.src);
+            mediaContainer.appendChild(img);
+
+            const mediaInfo = document.createElement("div");
+            mediaInfo.className = "media-info";
+            mediaInfo.textContent = `${fileType === "gif" ? "🎞️" : "🖼️"} ${
+              message.local_media_file.filename
+            }`;
+            mediaContainer.appendChild(mediaInfo);
+          } else if (fileType === "video") {
+            // Video files
+            const video = document.createElement("video");
+            video.className = "media-video";
+            video.controls = true;
+            video.preload = "metadata";
+            video.style.maxWidth = "100%";
+            video.style.maxHeight = "300px";
+            video.src = filePath;
+            mediaContainer.appendChild(video);
+
+            const mediaInfo = document.createElement("div");
+            mediaInfo.className = "media-info";
+            mediaInfo.textContent = `🎥 ${message.local_media_file.filename}`;
+            mediaContainer.appendChild(mediaInfo);
+          } else if (fileType === "audio") {
+            // Audio files
+            const audio = document.createElement("audio");
+            audio.className = "media-audio";
+            audio.controls = true;
+            audio.preload = "metadata";
+            audio.style.width = "100%";
+            audio.src = filePath;
+            mediaContainer.appendChild(audio);
+
+            const mediaInfo = document.createElement("div");
+            mediaInfo.className = "media-info";
+            mediaInfo.textContent = `🎵 ${message.local_media_file.filename}`;
+            mediaContainer.appendChild(mediaInfo);
+          } else {
+            // Other files (documents, archives, etc.)
+            const fileInfo = document.createElement("div");
+            fileInfo.className = "media-file";
+            fileInfo.style.padding = "12px";
+            fileInfo.style.background = "rgba(255, 255, 255, 0.1)";
+            fileInfo.style.borderRadius = "8px";
+            fileInfo.style.cursor = "pointer";
+
+            const fileIcon = getFileIcon(fileType);
+            const fileSize = message.local_media_file.file_size || "";
+
+            fileInfo.innerHTML = `
+              <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 24px;">${fileIcon}</span>
+                <div>
+                  <div style="font-weight: 500; color: #ffffff;">${
+                    message.local_media_file.filename
+                  }</div>
+                  <div style="font-size: 12px; color: #8E9BA8;">${fileType.toUpperCase()} ${fileSize}</div>
+                </div>
+              </div>
+            `;
+
+            // Make file downloadable
+            fileInfo.onclick = () => {
+              const link = document.createElement("a");
+              link.href = filePath;
+              link.download = message.local_media_file.filename;
+              link.click();
+            };
+
+            mediaContainer.appendChild(fileInfo);
+          }
+
+          bubble.appendChild(mediaContainer);
+        }
+
+        // Text content
+        if (message.message) {
+          const content = document.createElement("div");
+          content.className = "message-content";
+          content.textContent = message.message;
+          bubble.appendChild(content);
+        }
+
+        messageDiv.appendChild(bubble);
+        return messageDiv;
+      }
+
+      function getFileType(filename) {
+        const ext = filename.toLowerCase();
+
+        // Static images
+        if (
+          [".jpg", ".jpeg", ".png", ".webp", ".bmp"].some((e) =>
+            ext.endsWith(e),
+          )
+        ) {
+          return "image";
+        }
+
+        // Animated images
+        if (ext.endsWith(".gif")) {
+          return "gif";
+        }
+
+        // Videos
+        if (
+          [".mp4", ".mov", ".avi", ".mkv", ".webm", ".m4v", ".3gp"].some((e) =>
+            ext.endsWith(e),
+          )
+        ) {
+          return "video";
+        }
+
+        // Audio
+        if (
+          [".mp3", ".wav", ".ogg", ".m4a", ".aac", ".flac"].some((e) =>
+            ext.endsWith(e),
+          )
+        ) {
+          return "audio";
+        }
+
+        // Documents
+        if (
+          [".pdf", ".doc", ".docx", ".txt", ".rtf"].some((e) => ext.endsWith(e))
+        ) {
+          return "document";
+        }
+
+        // Archives
+        if (
+          [".zip", ".rar", ".7z", ".tar", ".gz"].some((e) => ext.endsWith(e))
+        ) {
+          return "archive";
+        }
+
+        return "file";
+      }
+
+      function isImageFile(filename) {
+        const type = getFileType(filename);
+        return type === "image" || type === "gif";
+      }
+
+      function getFileIcon(fileType) {
+        const icons = {
+          document: "📄",
+          archive: "📦",
+          file: "📎",
+          pdf: "📕",
+          video: "🎥",
+          audio: "🎵",
+          image: "🖼️",
+          gif: "🎞️",
+        };
+        return icons[fileType] || "📎";
+      }
+
+      function formatDate(dateString) {
+        const date = new Date(dateString);
+        const dateFormat =
+          document.getElementById("dateFormat")?.value || "absolute";
+
+        if (dateFormat === "relative") {
+          // Relative format based on current time
+          const now = new Date();
+          const diff = now - date;
+          const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+
+          if (days === 0) {
+            return date.toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            });
+          } else if (days === 1) {
+            return (
+              "Yesterday " +
+              date.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            );
+          } else if (days < 7) {
+            return (
+              date.toLocaleDateString([], { weekday: "short" }) +
+              " " +
+              date.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            );
+          } else {
+            return (
+              date.toLocaleDateString() +
+              " " +
+              date.toLocaleTimeString([], {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            );
+          }
+        } else {
+          // Absolute format - consistent regardless of when viewed
+          const options = {
+            year: "numeric",
+            month: "short",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+          };
+
+          return date.toLocaleDateString("en-US", options);
+        }
+      }
+
+      function filterMessages() {
+        const searchTerm = document
+          .getElementById("searchInput")
+          .value.toLowerCase();
+        const filterType = document.getElementById("filterType").value;
+
+        let filtered = allMessages;
+
+        // Apply search filter
+        if (searchTerm) {
+          filtered = filtered.filter(
+            (message) =>
+              (message.message &&
+                message.message.toLowerCase().includes(searchTerm)) ||
+              (message.local_media_file &&
+                message.local_media_file.filename
+                  .toLowerCase()
+                  .includes(searchTerm)),
+          );
+        }
+
+        // Apply type filter
+        if (filterType === "media") {
+          filtered = filtered.filter((message) => message.local_media_file);
+        } else if (filterType === "images") {
+          filtered = filtered.filter(
+            (message) =>
+              message.local_media_file &&
+              (getFileType(message.local_media_file.filename) === "image" ||
+                getFileType(message.local_media_file.filename) === "gif"),
+          );
+        } else if (filterType === "videos") {
+          filtered = filtered.filter(
+            (message) =>
+              message.local_media_file &&
+              getFileType(message.local_media_file.filename) === "video",
+          );
+        } else if (filterType === "audio") {
+          filtered = filtered.filter(
+            (message) =>
+              message.local_media_file &&
+              getFileType(message.local_media_file.filename) === "audio",
+          );
+        } else if (filterType === "documents") {
+          filtered = filtered.filter(
+            (message) =>
+              message.local_media_file &&
+              ["document", "archive", "file"].includes(
+                getFileType(message.local_media_file.filename),
+              ),
+          );
+        } else if (filterType === "text") {
+          filtered = filtered.filter(
+            (message) => message.message && !message.local_media_file,
+          );
+        }
+
+        // Sort filtered messages
+        filtered = filtered.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        currentMessages = filtered;
+        displayMessages(filtered);
+        updateStats(filtered.length, allMessages.length);
+      }
+
+      function updateStats(shown, total) {
+        const messageCount = document.getElementById("messageCount");
+        messageCount.textContent = `Showing ${shown} of ${total} messages`;
+      }
+
+      function refreshDisplay() {
+        // Re-render current messages to apply new date format
+        if (currentMessages.length > 0) {
+          displayMessages(currentMessages, false); // Don't auto-scroll when just refreshing
+        }
+      }
+
+      function showError(message) {
+        const chatContainer = document.getElementById("chatContainer");
+        chatContainer.innerHTML = `<div class="error">${message}</div>`;
+      }
+
+      function openImageModal(imageSrc) {
+        const modal = document.getElementById("imageModal");
+        const modalImage = document.getElementById("modalImage");
+        modalImage.src = imageSrc;
+        modal.style.display = "flex";
+
+        // For GIFs, ensure they play automatically
+        if (imageSrc.toLowerCase().endsWith(".gif")) {
+          modalImage.style.imageRendering = "auto";
+        }
+      }
+
+      function closeModal() {
+        const modal = document.getElementById("imageModal");
+        modal.style.display = "none";
+      }
+
+      // Close modal when clicking outside the image
+      document
+        .getElementById("imageModal")
+        .addEventListener("click", function (e) {
+          if (e.target === this) {
+            closeModal();
+          }
+        });
+
+      // Keyboard shortcuts
+      document.addEventListener("keydown", function (e) {
+        if (e.key === "Escape") {
+          closeModal();
+        }
+      });
+
+      // Auto-populate thread options based on available backup folders
+      window.addEventListener("load", async function () {
+        // Load user mappings on page load
+        await loadUserMappings();
+        // You can modify this to dynamically scan for available threads
+        console.log(
+          "Telegram Viewer loaded. Make sure your backup folder is accessible via HTTP server.",
+        );
+      });
+    </script>
+  </body>
+</html>

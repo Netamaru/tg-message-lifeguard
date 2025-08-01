@@ -6,6 +6,7 @@ This tool allows you to recover deleted messages and media from Telegram channel
 ### ✨ Latest Features
 - **🗂️ Organized Backup Structure:** Files are now automatically organized in `backup/{channel_id}/` folders
 - **👤 User-Based Filtering:** Filter messages by who deleted them (admin, user, or specific person)
+- **🧵 Thread/Topic Filtering:** Filter messages by specific thread or forum topic ID
 - **📊 Enhanced Logging:** See who deleted each message in the output
 - **🎯 Better Organization:** Each channel/group gets its own dedicated backup folder
 
@@ -77,6 +78,13 @@ To filter by who deleted messages, you'll need user IDs:
 - **Admin/Bot IDs:** Check group member lists or use Telegram's developer tools
 - **Skip filtering:** Enter `0` to backup all deleted messages regardless of who deleted them
 
+### 🧵 Getting Thread/Topic IDs (Optional - for filtering)
+To filter by specific threads or topics, you'll need thread IDs:
+- **Forum Topics:** Right-click topic → "Copy Link" → Extract ID from URL (e.g., `https://t.me/c/1234567890/123` → thread ID is `123`)
+- **Reply Threads:** Use the message ID of the original message that started the thread
+- **Regular Messages:** Any message ID can be used to filter messages in that specific thread
+- **Skip filtering:** Enter `0` to backup messages from all threads and topics
+
 ---
 
 ## 🚀 Starting the Recovery Process
@@ -95,6 +103,7 @@ The script will prompt you to enter:
 - **max_message_id:** Maximum message ID to retrieve (0 for all messages).
 - **group_id:** The channel or group ID to backup from.
 - **filter_user_id:** User ID to filter by who deleted messages (0 for no filter).
+- **message_thread_id:** Thread/topic ID to filter by (0 for no filter).
 
 ### 🔐 Authorization Step
 
@@ -142,7 +151,7 @@ This will recover messages within the specified range.
 ### 📌 Group or Channel ID
 Enter the `group_chat_id` obtained earlier. The ID typically starts with a minus sign (e.g., `-1001234567890`).
 
-### 👤 User Filtering (New Feature)
+### 👤 User Filtering
 You can now filter messages by who deleted them:
 - **Enter a specific user ID:** Only backup messages deleted by that user.
 - **Enter `0`:** No filter - backup messages deleted by anyone (default behavior).
@@ -152,12 +161,29 @@ This is useful for:
 - Focusing on messages deleted by specific moderators
 - Analyzing deletion patterns by user
 
+### 🧵 Thread/Topic Filtering (New Feature)
+You can now filter messages by specific threads or forum topics:
+- **Enter a specific thread/topic ID:** Only backup messages from that thread/topic.
+- **Enter `0`:** No filter - backup messages from all threads/topics (default behavior).
+
+This works with:
+- **Forum Topics:** Filter by forum topic ID in Telegram groups with topics enabled
+- **Reply Threads:** Filter by the original message ID that started a reply thread
+- **Regular Messages:** Use the message ID itself for messages that aren't part of threads
+
+**How to find thread/topic IDs:**
+- **Forum topics:** Right-click on topic title → Copy message link → Extract the topic ID from URL
+- **Reply threads:** Use the message ID of the first message in the thread
+- **Message inspection:** Use developer tools or Telegram clients that show message details
+
 ---
 
 ## 📥 Output and Recovery Management
 
 ### 📁 Folder Structure
 The recovered media files and `dump.json` will be automatically organized in the following structure:
+
+**Without thread filtering:**
 ```
 backup/
 └── {channel_id}/
@@ -167,7 +193,20 @@ backup/
     └── ...
 ```
 
-**Example:** For channel ID `-1001234567890`, files will be saved to `backup/1001234567890/`
+**With thread filtering:**
+```
+backup/
+└── {channel_id}/
+    └── thread_{thread_id}/
+        ├── dump.json
+        ├── {message_id}.jpg
+        ├── {message_id}.mp4
+        └── ...
+```
+
+**Examples:** 
+- Channel ID `-1001234567890` (no thread filter): `backup/1001234567890/`
+- Channel ID `-1001234567890` with thread ID `123`: `backup/1001234567890/thread_123/`
 
 ### 📄 Output Details
 - **Media files:** Named after their corresponding message ID (e.g., `12345.jpg`)
