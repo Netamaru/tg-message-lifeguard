@@ -9,10 +9,35 @@ import socketserver
 import webbrowser
 import os
 import sys
+import json
 from pathlib import Path
+import base64
+from http.server import HTTPServer, SimpleHTTPRequestHandler
+
+def load_config():
+    """Load configuration from config.json"""
+    try:
+        with open('config.json', 'r') as f:
+            config = json.load(f)
+            return config
+    except FileNotFoundError:
+        print("⚠️  config.json not found. Using default credentials.")
+        return {"username": "admin", "password": "default"}
+    except json.JSONDecodeError:
+        print("⚠️  Invalid config.json format. Using default credentials.")
+        return {"username": "admin", "password": "default"}
 
 def main():
-    PORT = 8000
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Telegram Message Viewer Server')
+    parser.add_argument('--headless', action='store_true', help='Run in headless mode (no browser auto-open)')
+    parser.add_argument('--host', default='localhost', help='Host to bind to (use 0.0.0.0 for all interfaces)')
+    parser.add_argument('--port', type=int, default=8000, help='Port to serve on')
+    args = parser.parse_args()
+    
+    PORT = args.port
+    HOST = args.host
     
     # Change to the directory containing the viewer
     viewer_dir = Path(__file__).parent
@@ -20,7 +45,9 @@ def main():
     
     print(f"🚀 Starting Telegram Message Viewer...")
     print(f"📁 Serving from: {viewer_dir}")
-    print(f"🌐 Server will be available at: http://localhost:{PORT}")
+    if args.headless:
+        print(f"🖥️  Running in headless mode")
+    print(f"🌐 Server will be available at: http://{HOST}:{PORT}")
     
     # Check if backup folder exists
     backup_path = viewer_dir / "backup"
@@ -51,30 +78,68 @@ def main():
     print(f"5. Use Ctrl+C to stop the server")
     print(f"{'='*50}\n")
 
-    class MyHTTPRequestHandler(http.server.SimpleHTTPRequestHandler):
-        def end_headers(self):
-            # Add CORS headers to allow local file access
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-            super().end_headers()
+    # Load config once at startup
+    config = load_config()
+    
+    class AuthHandler(SimpleHTTPRequestHandler):
+        def do_HEAD(self):
+            self.send_response(200)
+            self.end_headers()
+            
+        def do_AUTHHEAD(self):
+            self.send_response(401)
+            self.send_header('WWW-Authenticate', 'Basic realm="Telegram Viewer"')
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+
+        def do_GET(self):
+            # Block access to config files
+            if self.path.endswith('/config.json') or self.path.endswith('/users.json'):
+                self.send_error(403, "Access denied")
+                return
+            
+            # Check for authorization header
+            if self.headers.get('Authorization') is None:
+                self.do_AUTHHEAD()
+                self.wfile.write(b'Authentication required')
+                return
+            
+            # Decode and verify credentials
+            auth_header = self.headers.get('Authorization')
+            if not self.verify_credentials(auth_header):
+                self.do_AUTHHEAD()
+                self.wfile.write(b'Invalid credentials')
+                return
+                
+            # Continue with normal file serving
+            super().do_GET()
         
-        def log_message(self, format, *args):
-            # Custom logging to show what's being accessed
-            if not self.path.endswith(('.ico', '.css', '.js')):
-                print(f"📥 {self.command} {self.path}")
+        def verify_credentials(self, auth_header):
+            # Extract base64 encoded credentials
+            encoded_creds = auth_header.split(' ')[1]
+            decoded_creds = base64.b64decode(encoded_creds).decode('utf-8')
+            username, password = decoded_creds.split(':')
+            
+            # Check against credentials from config.json
+            return username == config.get("username", "admin") and password == config.get("password", "default")
 
     try:
-        with socketserver.TCPServer(("", PORT), MyHTTPRequestHandler) as httpd:
+        with socketserver.TCPServer((HOST, PORT), AuthHandler) as httpd:
             print(f"🎉 Server started successfully!")
             
-            # Open browser automatically
-            try:
-                webbrowser.open(f'http://localhost:{PORT}/telegram_viewer.html')
-                print(f"🌐 Opening browser...")
-            except Exception as e:
-                print(f"⚠️  Could not open browser automatically: {e}")
-                print(f"   Please open http://localhost:{PORT}/telegram_viewer.html manually")
+            if not args.headless:
+                # Open browser automatically only if not headless
+                try:
+                    webbrowser.open(f'http://{HOST}:{PORT}/index.html')
+                    print(f"🌐 Opening browser...")
+                except Exception as e:
+                    print(f"⚠️  Could not open browser automatically: {e}")
+                    print(f"   Please open http://{HOST}:{PORT}/index.html manually")
+            else:
+                print(f"🌐 Access the viewer at: http://{HOST}:{PORT}/index.html")
+                if HOST == "0.0.0.0":
+                    print(f"   Or use your server's IP address: http://YOUR_SERVER_IP:{PORT}/index.html")
+                print(f"📝 Credentials loaded from config.json: username='{config.get('username', 'admin')}'")
             
             print(f"\n⏳ Server running... Press Ctrl+C to stop")
             httpd.serve_forever()
