@@ -93,8 +93,8 @@ def main():
             self.end_headers()
 
         def do_GET(self):
-            # Block access to config files
-            if self.path.endswith('/config.json') or self.path.endswith('/users.json'):
+            # Block access to config files (but allow users.json)
+            if self.path.endswith('/config.json'):
                 self.send_error(403, "Access denied")
                 return
             
